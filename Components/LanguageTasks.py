@@ -1,10 +1,14 @@
 from pydantic import BaseModel,Field
 from dotenv import load_dotenv
 import os
+import requests
+import json
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API")
+model_base_url = os.getenv("MODEL_BASE_URL")
+api_key = os.getenv("OPENROUTER_API")
+model = "tngtech/deepseek-r1t2-chimera:free"
 
 if not api_key:
     raise ValueError("API key not found. Make sure it is defined in the .env file.")
@@ -26,99 +30,102 @@ class JSONResponse(BaseModel):
 
 system = """
 The input contains a timestamped transcription of a video.
-Select a 2-minute segment from the transcription that contains something interesting, useful, surprising, controversial, or thought-provoking.
+Select a 1-miniute segment from the transcription that contains something interesting, useful, surprising, controversial, or thought-provoking.
 The selected text should contain only complete sentences.
 Do not cut the sentences in the middle.
 The selected text should form a complete thought.
 Return a JSON object with the following structure:
 ## Output 
-[{{
-    start: "Start time of the segment in seconds (number)",
-    content: "The transcribed text from the selected segment (clean text only, NO timestamps)",
-    end: "End time of the segment in seconds (number)"
-}}]
-
-## Input
-{Transcription}
+{
+    "start": "Start time of the segment in seconds (number)",
+    "content": "The transcribed text from the selected segment (clean text only, NO timestamps)",
+    "end": "End time of the segment in seconds (number)"
+}
 """
 
-# User = """
-# Example
-# """
-
-
-
-
 def GetHighlight(Transcription):
-    from langchain_openai import ChatOpenAI
-    
     try:
-        llm = ChatOpenAI(
-            model="gpt-5-nano",  # Much cheaper than gpt-4o
-            temperature=1.0,
-            api_key = api_key
-        )
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
 
-        from langchain.prompts import ChatPromptTemplate
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system",system),
-                ("user",Transcription)
-            ]
-        )
-        chain = prompt |llm.with_structured_output(JSONResponse,method="function_calling")
-        
-        print("Calling LLM for highlight selection...")
-        response = chain.invoke({"Transcription":Transcription})
-        
-        # Validate response
-        if not response:
-            print("ERROR: LLM returned empty response")
-            return None, None
-        
-        if not hasattr(response, 'start') or not hasattr(response, 'end'):
-            print(f"ERROR: Invalid response structure: {response}")
-            return None, None
-        
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": Transcription}
+            ],
+            "temperature": 1.0,
+            "response_format": { "type": "json_object" }
+        }
+
+        print(f"Calling LLM ({model}) for highlight selection via HTTP...")
+        response = requests.post(model_base_url, headers=headers, json=payload)
+        response.raise_for_status()
+
+        result = response.json()
+        content_str = result['choices'][0]['message']['content']
+
         try:
-            Start = int(response.start)
-            End = int(response.end)
-        except (ValueError, TypeError) as e:
-            print(f"ERROR: Could not parse start/end times from response")
-            print(f"  response.start: {response.start}")
-            print(f"  response.end: {response.end}")
-            print(f"  Error: {e}")
-            return None, None
-        
+            data = json.loads(content_str)
+        except json.JSONDecodeError:
+            # Fallback: try to find JSON in the string if it's wrapped in markdown
+            import re
+            match = re.search(r'\{.*\}', content_str, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+            else:
+                raise ValueError("Could not parse JSON from response")
+
+        # Validate structure
+        if 'start' not in data or 'end' not in data:
+            print(f"Warning: Unexpected JSON structure: {data.keys()}")
+
+        # Use Pydantic for validation if available, or manual
+        try:
+            response_obj = JSONResponse(**data)
+            Start = float(response_obj.start)
+            End = float(response_obj.end)
+            Content = response_obj.content
+        except Exception as e:
+            # Manual fallback
+            Start = float(data.get('start', 0))
+            End = float(data.get('end', 0))
+            Content = data.get('content', "")
+
         # Validate times
         if Start < 0 or End < 0:
             print(f"ERROR: Negative time values - Start: {Start}s, End: {End}s")
             return None, None
-        
+
         if End <= Start:
             print(f"ERROR: Invalid time range - Start: {Start}s, End: {End}s (end must be > start)")
             return None, None
-        
+
         # Log the selected segment
         print(f"\n{'='*60}")
         print(f"SELECTED SEGMENT DETAILS:")
         print(f"Time: {Start}s - {End}s ({End-Start}s duration)")
-        print(f"Content: {response.content}")
+        print(f"Content: {Content}")
         print(f"{'='*60}\n")
-        
+
         if Start==End:
             Ask = input("Error - Get Highlights again (y/n) -> ").lower()
             if Ask == "y":
-                Start, End = GetHighlight(Transcription)
+                return GetHighlight(Transcription)
             return Start, End
+
         return Start,End
-        
+
     except Exception as e:
         print(f"\n{'='*60}")
         print(f"ERROR IN GetHighlight FUNCTION:")
         print(f"{'='*60}")
         print(f"Exception type: {type(e).__name__}")
         print(f"Exception message: {str(e)}")
+        if isinstance(e, requests.exceptions.HTTPError):
+            print(f"Response: {e.response.text}")
         print(f"\nTranscription length: {len(Transcription)} characters")
         print(f"First 200 chars: {Transcription[:200]}...")
         print(f"{'='*60}\n")

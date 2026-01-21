@@ -18,18 +18,18 @@ def download_youtube_video(url):
         for i, stream in enumerate(video_streams[:5]):  # Show top 5 options
             size = get_video_size(stream)
             stream_type = "Progressive" if stream.is_progressive else "Adaptive"
-            print(f"  {i}. Resolution: {stream.resolution}, Size: {size:.2f} MB, Type: {stream_type}")
+            print(f"  {i}. Resolution: {stream.resolution}, Mime Type: {stream.mime_type}, Size: {stream.filesize_mb} MB, Includes Audio Track: {stream.includes_audio_track}")
         
         # Interactive selection with timeout
         import select
         import sys
         
-        print("\nSelect resolution number (0-4) or wait 5s for auto-select...")
-        print("Auto-selecting highest quality in 5 seconds...")
+        print("\nSelect resolution number (0-4) or wait 15s for auto-select...")
+        print("Auto-selecting highest quality in 15 seconds...")
         
         selected_stream = None
         try:
-            ready, _, _ = select.select([sys.stdin], [], [], 5)
+            ready, _, _ = select.select([sys.stdin], [], [], 15)
             if ready:
                 user_input = sys.stdin.readline().strip()
                 if user_input.isdigit():
@@ -64,7 +64,7 @@ def download_youtube_video(url):
         print(f"Downloading video: {yt.title}")
         video_file = selected_stream.download(output_path='videos', filename_prefix="video_")
 
-        if not selected_stream.is_progressive:
+        if not selected_stream.includes_audio_track:
             print("Downloading audio...")
             audio_file = audio_stream.download(output_path='videos', filename_prefix="audio_")
 

@@ -38,7 +38,7 @@ def add_subtitles_to_video(input_video, output_video, transcriptions, video_star
     
     # Scale font size proportionally to video height (~6.5% of height)
     # 1080p → 70px, 720p → 47px
-    dynamic_fontsize = int(video.h * 0.065)
+    dynamic_fontsize = int(video.h * 0.05)
     
     for text, start, end in relevant_transcriptions:
         # Clean up text
@@ -50,12 +50,13 @@ def add_subtitles_to_video(input_video, output_video, transcriptions, video_star
         txt_clip = TextClip(
             text,
             fontsize=dynamic_fontsize,
-            color='#2699ff',
-            stroke_color='black',
-            stroke_width=2,
-            font='Franklin-Gothic',
+            color="#FFFFFF",
+            bg_color="#2E2E2ED9",
+            # stroke_color='white',
+            # stroke_width=dynamic_fontsize*0.04,
+            font='Noto-Sans-CJK-SC-Bold',#Franklin-Gothic
             method='caption',
-            size=(video.w - 100, None)  # Leave 50px margin on each side
+            size=(video.w - 80, None)  # Leave 40px margin on each side
         )
         
         # Position at bottom center
@@ -82,3 +83,11 @@ def add_subtitles_to_video(input_video, output_video, transcriptions, video_star
     video.close()
     final_video.close()
     print(f"✓ Subtitles added successfully -> {output_video}")
+
+if __name__ == "__main__":
+    # print(TextClip.list('color'))
+    input_video='temp_cropped_7a4aa9c2.mp4'
+    output_video='temp_subtitled_7a4aa9c2.mp4'
+    video_start_time=0
+    ranscriptions=[['院長好 那今年來呢 usa國防預算呂創新高', 0.0, 4.82], ['所以身為民意代表 USA我們當然是要仔細監督', 5.04, 8.34], ['人民的納稅錢如何被使用 123那既然我們編列', 8.34, 12.26], ['國防預算是行政院的重點政策', 12.26, 14.82], ['相信院長對相關的事已有所瞭解', 14.82, 18.259999999999998], ['我想先問一下我們院長', 18.259999999999998, 21.259999999999998], ['到目前為止', 21.259999999999998, 22.759999999999998], ['為止美國機器臺灣的軍售品項', 22.759999999999998, 26.560000000000002], ['價值總共是多少', 26.560000000000002, 28.560000000000002]]
+    add_subtitles_to_video(input_video, output_video, ranscriptions, video_start_time)
