@@ -33,7 +33,7 @@ AI-powered tool to automatically generate engaging YouTube Shorts from long-form
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/SamurAIGPT/AI-Youtube-Shorts-Generator.git
+   git clone https://github.com/anatoliybuzov47/AI-Youtube-Shorts-Generator.git
    cd AI-Youtube-Shorts-Generator
    ```
 
@@ -50,7 +50,7 @@ AI-powered tool to automatically generate engaging YouTube Shorts from long-form
 
 4. **Create and activate virtual environment:**
    ```bash
-   python3.10 -m venv venv
+   python3.12 -m venv venv
    source venv/bin/activate
    ```
 
